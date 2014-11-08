@@ -44,7 +44,8 @@ bool parse_array(std::istream& input, Array& array);
 bool parse_bool(std::istream& input, Boolean& value);
 bool parse_comment(std::istream &input);
 bool parse_null(std::istream& input);
-bool parse_number(std::istream& input, Number& value);
+bool parse_integer(std::istream& input, Integer& value);
+bool parse_double(std::istream& input, Double& value);
 bool parse_object(std::istream& input, Object& object);
 bool parse_string(std::istream& input, String& value);
 bool parse_identifier(std::istream& input, String& value);
@@ -181,7 +182,21 @@ bool parse_identifier(std::istream& input, String& value) {
     }
 }
 
-bool parse_number(std::istream& input, Number& value) {
+bool parse_integer(std::istream& input, Integer& value) {
+    input >> std::ws;
+    std::streampos rollback = input.tellg();
+    input >> value;
+    // if the next character is a dot, we consider that the number is a 
+    // floating point number 
+    if (input.fail() || input.peek() == '.') {
+        input.clear();
+        input.seekg(rollback);
+        return false;
+    }
+    return true;
+}
+
+bool parse_double(std::istream& input, Double& value) {
     input >> std::ws;
     std::streampos rollback = input.tellg();
     input >> value;
@@ -345,8 +360,14 @@ bool Value::parse(std::istream& input, Value& value) {
         value.type_ = STRING_;
         return true;
     }
-    if (parse_number(input, value.number_value_)) {
-        value.type_ = NUMBER_;
+
+    if (parse_integer(input, value.integer_value_)) {
+        value.type_ = INTEGER_;
+        return true;
+    }
+
+    if (parse_double(input, value.double_value_)) {
+        value.type_ = DOUBLE_;
         return true;
     }
 
@@ -454,8 +475,10 @@ static std::ostream& stream_string(std::ostream& stream,
 
 std::ostream& operator<<(std::ostream& stream, const jsonxx::Value& v) {
     using namespace jsonxx;
-    if (v.is<Number>()) {
-        return stream << v.get<Number>();
+    if (v.is<Integer>()) {
+        return stream << v.get<Integer>();
+    } else if (v.is<Double>()) {
+        return stream << v.get<Double>();
     } else if (v.is<String>()) {
         return stream_string(stream, v.get<std::string>());
     } else if (v.is<Boolean>()) {
@@ -597,10 +620,14 @@ namespace json {
                   ss << tag( format, depth+1, it->first, *it->second );
                 return remove_last_comma( ss.str() ) + tab + "}" ",\n";
 
-            case jsonxx::Value::NUMBER_:
+            case jsonxx::Value::INTEGER_:
+                ss << t.integer_value_;
+                return ss.str() + ",\n";
+
+            case jsonxx::Value::DOUBLE_:
                 // max precision
-                ss << std::setprecision(std::numeric_limits<long double>::digits10 + 1);
-                ss << t.number_value_;
+                ss << std::setprecision(std::numeric_limits<Double>::digits10 + 1);
+                ss << t.double_value_;
                 return ss.str() + ",\n";
         }
     }
@@ -689,7 +716,8 @@ std::string open_tag( unsigned format, char type, const std::string &name, const
                 case 'a': tagname = "json:array" + tagname; break;
                 case 's': tagname = "json:string" + tagname; break;
                 case 'o': tagname = "json:object" + tagname; break;
-                case 'n': tagname = "json:number" + tagname; break;
+                case 'i': tagname = "json:integer" + tagname; break;
+                case 'd': tagname = "json:double" + tagname; break;
             }
             break;
 
@@ -705,7 +733,8 @@ std::string open_tag( unsigned format, char type, const std::string &name, const
                 case 'a': tagname += " type=\"json:array\""; break;
                 case 's': tagname += " type=\"json:string\""; break;
                 case 'o': tagname += " type=\"json:object\""; break;
-                case 'n': tagname += " type=\"json:number\""; break;
+                case 'i': tagname += " type=\"json:integer\""; break;
+                case 'd': tagname += " type=\"json:double\""; break;
             }
 
             if( !name.empty() )
@@ -735,7 +764,8 @@ std::string close_tag( unsigned format, char type, const std::string &name ) {
                 case 'a': return "</json:array>";
                 case 'o': return "</json:object>";
                 case 's': return "</json:string>";
-                case 'n': return "</json:number>";
+                case 'i': return "</json:integer>";
+                case 'd': return "</json:double>";
             }
             break;
 
@@ -785,10 +815,16 @@ std::string tag( unsigned format, unsigned depth, const std::string &name, const
                        + ss.str()
                  + tab + close_tag( format, 'o', name ) + '\n';
 
-        case jsonxx::Value::NUMBER_:
+        case jsonxx::Value::INTEGER_:
+            ss << t.integer_value_;
+            return tab + open_tag( format, 'n', name, std::string(), format == jsonxx::JXMLex ? ss.str() : std::string() )
+                       + ss.str()
+                       + close_tag( format, 'n', name ) + '\n';
+
+        case jsonxx::Value::DOUBLE_:
             // max precision
-            ss << std::setprecision(std::numeric_limits<long double>::digits10 + 1);
-            ss << t.number_value_;
+            ss << std::setprecision(std::numeric_limits<Double>::digits10 + 1);
+            ss << t.double_value_;
             return tab + open_tag( format, 'n', name, std::string(), format == jsonxx::JXMLex ? ss.str() : std::string() )
                        + ss.str()
                        + close_tag( format, 'n', name ) + '\n';

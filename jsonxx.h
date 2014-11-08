@@ -60,7 +60,8 @@ enum Format {
 };
 
 // Types
-typedef long double Number;
+typedef long long Integer;
+typedef long double Double;
 typedef bool Boolean;
 typedef std::string String;
 struct Null {};
@@ -179,7 +180,7 @@ class Array {
   container values_;
 };
 
-// A value could be a number, an array, a string, an object, a
+// A value could be an integer, a double, an array, a string, an object, a
 // boolean, or null
 class Value {
  public:
@@ -200,24 +201,34 @@ class Value {
     type_ = BOOL_;
     bool_value_ = b;
   }
-#define $number(TYPE) \
+
+#define $integer(TYPE) \
   void import( const TYPE &n ) { \
     reset(); \
-    type_ = NUMBER_; \
-    number_value_ = static_cast<long double>(n); \
+    type_ = INTEGER_; \
+    integer_value_ = static_cast<Integer>(n); \
   }
-  $number( char )
-  $number( int )
-  $number( long )
-  $number( long long )
-  $number( unsigned char )
-  $number( unsigned int )
-  $number( unsigned long )
-  $number( unsigned long long )
-  $number( float )
-  $number( double )
-  $number( long double )
-#undef $number
+  $integer( char )
+  $integer( int )
+  $integer( long )
+  $integer( long long )
+  $integer( unsigned char )
+  $integer( unsigned int )
+  $integer( unsigned long )
+  $integer( unsigned long long )
+#undef $integer
+
+#define $double(TYPE) \
+  void import( const TYPE &n ) { \
+    reset(); \
+    type_ = DOUBLE_; \
+    double_value_ = static_cast<Double>(n); \
+  }
+  $double( float )
+  $double( double )
+  $double( long double )
+#undef $double
+
 #if JSONXX_COMPILER_HAS_CXX11 > 0
   void import( const std::nullptr_t & ) {
     reset();
@@ -252,8 +263,11 @@ class Value {
       case BOOL_:
         import( other.bool_value_ );
         break;
-      case NUMBER_:
-        import( other.number_value_ );
+      case INTEGER_:
+        import( other.integer_value_ );
+        break;
+      case DOUBLE_:
+        import( other.double_value_ );
         break;
       case STRING_:
         import( *other.string_value_ );
@@ -302,7 +316,8 @@ class Value {
 
  public:
   enum {
-    NUMBER_,
+    INTEGER_,
+    DOUBLE_,
     STRING_,
     BOOL_,
     NULL_,
@@ -311,7 +326,8 @@ class Value {
     INVALID_
   } type_;
   union {
-    Number number_value_;
+    Integer integer_value_;
+    Double double_value_;
     String* string_value_;
     Boolean bool_value_;
     Array* array_value_;
@@ -404,8 +420,13 @@ inline bool Value::is<String>() const {
 }
 
 template<>
-inline bool Value::is<Number>() const {
-  return type_ == NUMBER_;
+inline bool Value::is<Integer>() const {
+  return type_ == INTEGER_;
+}
+
+template<>
+inline bool Value::is<Double>() const {
+  return type_ == DOUBLE_;
 }
 
 template<>
@@ -441,9 +462,15 @@ inline std::string& Value::get<String>() {
 }
 
 template<>
-inline Number& Value::get<Number>() {
-  JSONXX_ASSERT(is<Number>());
-  return number_value_;
+inline Integer& Value::get<Integer>() {
+  JSONXX_ASSERT(is<Integer>());
+  return integer_value_;
+}
+
+template<>
+inline Double& Value::get<Double>() {
+  JSONXX_ASSERT(is<Double>());
+  return double_value_;
 }
 
 template<>
@@ -471,9 +498,15 @@ inline const String& Value::get<String>() const {
 }
 
 template<>
-inline const Number& Value::get<Number>() const {
-  JSONXX_ASSERT(is<Number>());
-  return number_value_;
+inline const Integer& Value::get<Integer>() const {
+  JSONXX_ASSERT(is<Integer>());
+  return integer_value_;
+}
+
+template<>
+inline const Double& Value::get<Double>() const {
+  JSONXX_ASSERT(is<Double>());
+  return double_value_;
 }
 
 template<>
